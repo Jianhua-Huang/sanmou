@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>三谋模板管理</title>
+    <style>
+      :root {
+        --bg: #f5f7f6;
+        --panel: #ffffff;
+        --line: #dfe7e4;
+        --text: #182321;
+        --muted: #66736f;
+        --accent: #0f766e;
+        --soft: #e5f4f1;
+        --warn: #b45309;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background: var(--bg);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 28px));
+        margin: 24px auto 40px;
+      }
+
+      header, .toolbar, section, .team-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px;
+        margin-bottom: 14px;
+      }
+
+      h1, h2, h3 {
+        margin: 0;
+      }
+
+      h1 { font-size: 24px; }
+      h2 { font-size: 18px; }
+      h3 { font-size: 17px; }
+
+      .small {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px;
+        margin-bottom: 14px;
+      }
+
+      button, .file-button {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: var(--text);
+        background: #fff;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      button.primary {
+        border-color: var(--accent);
+        color: #fff;
+        background: var(--accent);
+      }
+
+      button.danger {
+        border-color: #fca5a5;
+        color: #b91c1c;
+        background: #fff5f5;
+      }
+
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 9px;
+        color: var(--text);
+        background: #fff;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+
+      label {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 14px;
+      }
+
+      section {
+        overflow: hidden;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfc;
+      }
+
+      .team-list {
+        display: grid;
+        gap: 8px;
+        max-height: 72vh;
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .team-button {
+        display: grid;
+        gap: 4px;
+        width: 100%;
+        text-align: left;
+      }
+
+      .team-button.active {
+        border-color: var(--accent);
+        background: var(--soft);
+      }
+
+      .editor {
+        display: grid;
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .general-card {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #fbfcfc;
+      }
+
+      .skill-card {
+        display: grid;
+        gap: 8px;
+        border: 1px solid #e8efec;
+        border-radius: 6px;
+        padding: 10px;
+        background: #fff;
+      }
+
+      .checks {
+        display: flex;
+        gap: 12px;
+      }
+
+      .checks label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .checks input {
+        width: auto;
+      }
+
+      .status {
+        min-height: 20px;
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      @media (max-width: 860px) {
+        header, .grid {
+          grid-template-columns: 1fr;
+        }
+
+        header {
+          align-items: start;
+          flex-direction: column;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>模板管理</h1>
+          <div class="small">管理强队模板、核心战法、重点战法和队伍专属平替。配置保存在当前浏览器，可导入导出 JSON。</div>
+        </div>
+        <a href="index.html">返回配队</a>
+      </header>
+
+      <div class="toolbar">
+        <button class="primary" id="newTeamBtn" type="button">新增队伍</button>
+        <button id="loadDefaultBtn" type="button">从默认数据导入</button>
+        <button id="exportBtn" type="button">导出 JSON</button>
+        <label class="file-button">
+          导入 JSON
+          <input id="importFile" type="file" accept="application/json" hidden>
+        </label>
+        <button class="danger" id="clearBtn" type="button">清空本地配置</button>
+        <div class="status" id="status"></div>
+      </div>
+
+      <div class="grid">
+        <section>
+          <div class="section-head">
+            <h2>队伍模板</h2>
+            <div class="small" id="teamCount">0 队</div>
+          </div>
+          <div class="team-list" id="teamList"></div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>编辑模板</h2>
+            <button class="danger" id="deleteBtn" type="button">删除当前队伍</button>
+          </div>
+          <div class="editor" id="editor"></div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "sanmouTemplateConfigV1";
+      const DATA_URL = "s2_data.json";
+      const state = {
+        config: { version: 1, teams: [] },
+        selected: -1,
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const normalize = (value) => String(value || "").trim();
+
+      function emptyTeam() {
+        return {
+          team_name: "新队伍",
+          tier: "T1",
+          generals: ["", "", ""],
+          skills: {},
+          skill_rules: {},
+        };
+      }
+
+      function ensureTeamShape(team) {
+        const shaped = {
+          team_name: normalize(team.team_name) || "未命名队伍",
+          tier: normalize(team.tier) || "T1",
+          generals: (team.generals || []).slice(0, 3),
+          skills: team.skills || {},
+          skill_rules: team.skill_rules || {},
+        };
+        while (shaped.generals.length < 3) shaped.generals.push("");
+        shaped.generals.forEach((general) => {
+          if (!shaped.skills[general]) shaped.skills[general] = ["", ""];
+          if (!shaped.skill_rules[general]) shaped.skill_rules[general] = {};
+          shaped.skills[general] = shaped.skills[general].slice(0, 2);
+          while (shaped.skills[general].length < 2) shaped.skills[general].push("");
+          shaped.skills[general].forEach((skill) => {
+            if (skill && !shaped.skill_rules[general][skill]) {
+              shaped.skill_rules[general][skill] = { core: false, important: false, replacements: [] };
+            }
+          });
+        });
+        return shaped;
+      }
+
+      function save() {
+        state.config.teams = state.config.teams.map(ensureTeamShape);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.config, null, 2));
+        setStatus("已保存");
+      }
+
+      function load() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) state.config = JSON.parse(raw);
+        } catch {
+          state.config = { version: 1, teams: [] };
+        }
+        state.config.version = 1;
+        state.config.teams = (state.config.teams || []).map(ensureTeamShape);
+        state.selected = state.config.teams.length ? 0 : -1;
+      }
+
+      function setStatus(text) {
+        $("status").textContent = text;
+        clearTimeout(setStatus.timer);
+        setStatus.timer = setTimeout(() => $("status").textContent = "", 1600);
+      }
+
+      function renderList() {
+        $("teamCount").textContent = `${state.config.teams.length} 队`;
+        $("teamList").innerHTML = state.config.teams.map((team, index) => `
+          <button class="team-button ${index === state.selected ? "active" : ""}" type="button" data-index="${index}">
+            <strong>${team.team_name}</strong>
+            <span class="small">${team.tier} · ${team.generals.filter(Boolean).join("、") || "未配置武将"}</span>
+          </button>
+        `).join("");
+      }
+
+      function ruleFor(team, general, skill) {
+        if (!team.skill_rules[general]) team.skill_rules[general] = {};
+        if (!team.skill_rules[general][skill]) {
+          team.skill_rules[general][skill] = { core: false, important: false, replacements: [] };
+        }
+        return team.skill_rules[general][skill];
+      }
+
+      function renderEditor() {
+        const team = state.config.teams[state.selected];
+        if (!team) {
+          $("editor").innerHTML = '<div class="small">请新增队伍或从默认数据导入。</div>';
+          return;
+        }
+
+        $("editor").innerHTML = `
+          <div class="form-grid">
+            <label>队伍名<input id="teamName" value="${team.team_name}"></label>
+            <label>T 强度<input id="teamTier" value="${team.tier}" placeholder="T0.5"></label>
+            <label>说明<input id="teamNote" value="${team.note || ""}" placeholder="可选"></label>
+          </div>
+          <div class="form-grid">
+            ${[0, 1, 2].map((generalIndex) => {
+              const general = team.generals[generalIndex] || "";
+              const skills = team.skills[general] || ["", ""];
+              return `
+                <div class="general-card" data-general-index="${generalIndex}">
+                  <label>武将 ${generalIndex + 1}<input class="general-input" value="${general}"></label>
+                  ${[0, 1].map((skillIndex) => {
+                    const skill = skills[skillIndex] || "";
+                    const rule = skill ? ruleFor(team, general, skill) : { core: false, important: false, replacements: [] };
+                    return `
+                      <div class="skill-card" data-skill-index="${skillIndex}">
+                        <label>战法 ${skillIndex + 1}<input class="skill-input" value="${skill}"></label>
+                        <div class="checks">
+                          <label><input class="core-input" type="checkbox" ${rule.core ? "checked" : ""}>核心不可替换</label>
+                          <label><input class="important-input" type="checkbox" ${rule.important ? "checked" : ""}>重点战法</label>
+                        </div>
+                        <label>专属平替（用顿号、逗号或换行分隔）
+                          <textarea class="replacement-input">${(rule.replacements || []).join("、")}</textarea>
+                        </label>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
+      function readEditor() {
+        const team = state.config.teams[state.selected];
+        if (!team) return;
+        const previous = JSON.parse(JSON.stringify(team));
+        team.team_name = normalize($("teamName").value);
+        team.tier = normalize($("teamTier").value);
+        team.note = normalize($("teamNote").value);
+        team.generals = [];
+        team.skills = {};
+        team.skill_rules = {};
+        document.querySelectorAll(".general-card").forEach((card) => {
+          const general = normalize(card.querySelector(".general-input").value);
+          team.generals.push(general);
+          team.skills[general] = [];
+          team.skill_rules[general] = {};
+          card.querySelectorAll(".skill-card").forEach((skillCard) => {
+            const skill = normalize(skillCard.querySelector(".skill-input").value);
+            team.skills[general].push(skill);
+            if (!skill) return;
+            const previousRule = previous.skill_rules?.[general]?.[skill] || {};
+            team.skill_rules[general][skill] = {
+              core: skillCard.querySelector(".core-input").checked,
+              important: skillCard.querySelector(".important-input").checked,
+              replacements: normalize(skillCard.querySelector(".replacement-input").value)
+                .split(/[、,，\n]/)
+                .map(normalize)
+                .filter(Boolean),
+              note: previousRule.note || "",
+            };
+          });
+        });
+        save();
+        renderList();
+      }
+
+      async function importDefaultTeams() {
+        const response = await fetch(DATA_URL, { cache: "no-store" });
+        const data = await response.json();
+        const teams = (data.s2_strong_teams || []).flatMap((group) =>
+          (group.teams || []).map((team) => ensureTeamShape({
+            team_name: team.team_name,
+            tier: team.tier || group.tier,
+            generals: team.generals || [],
+            skills: team.skills || {},
+            skill_rules: {},
+          }))
+        );
+        state.config.teams = teams;
+        state.selected = teams.length ? 0 : -1;
+        save();
+        render();
+      }
+
+      function exportConfig() {
+        readEditor();
+        const blob = new Blob([JSON.stringify(state.config, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "sanmou-template-config.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      function render() {
+        renderList();
+        renderEditor();
+      }
+
+      $("teamList").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-index]");
+        if (!button) return;
+        readEditor();
+        state.selected = Number(button.dataset.index);
+        render();
+      });
+
+      $("editor").addEventListener("input", () => {
+        readEditor();
+      });
+
+      $("newTeamBtn").addEventListener("click", () => {
+        readEditor();
+        state.config.teams.push(emptyTeam());
+        state.selected = state.config.teams.length - 1;
+        save();
+        render();
+      });
+
+      $("deleteBtn").addEventListener("click", () => {
+        if (state.selected < 0) return;
+        state.config.teams.splice(state.selected, 1);
+        state.selected = Math.min(state.selected, state.config.teams.length - 1);
+        save();
+        render();
+      });
+
+      $("loadDefaultBtn").addEventListener("click", importDefaultTeams);
+      $("exportBtn").addEventListener("click", exportConfig);
+      $("clearBtn").addEventListener("click", () => {
+        localStorage.removeItem(STORAGE_KEY);
+        state.config = { version: 1, teams: [] };
+        state.selected = -1;
+        render();
+        setStatus("已清空");
+      });
+
+      $("importFile").addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        state.config = JSON.parse(await file.text());
+        state.config.teams = (state.config.teams || []).map(ensureTeamShape);
+        state.selected = state.config.teams.length ? 0 : -1;
+        save();
+        render();
+        event.target.value = "";
+      });
+
+      load();
+      render();
+    </script>
+  </body>
+</html>

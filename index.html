@@ -575,7 +575,10 @@
           <h1>三谋 S2 配队匹配</h1>
           <div class="small">选择已有武将和战法，按 S2 攻略队伍计算匹配度。</div>
         </div>
-        <div class="status" id="status">正在读取队伍数据...</div>
+        <div>
+          <div class="status" id="status">正在读取队伍数据...</div>
+          <div class="small"><a href="admin.html">模板管理</a></div>
+        </div>
       </header>
 
       <div class="toolbar">
@@ -627,6 +630,7 @@
 
     <script>
       const DATA_URL = "s2_data.json";
+      const CONFIG_STORAGE_KEY = "sanmouTemplateConfigV1";
       const state = {
         teams: [],
         plans: [],
@@ -736,9 +740,59 @@
           id: `${source}-${index}`,
           generals: (team.generals || []).map(normalizeName).filter(Boolean),
           requiredSkills: Object.values(team.skills || {}).flat().map(normalizeName).filter(Boolean),
+          skillRules: team.skill_rules || {},
         };
         normalized.strength = strengthValue(normalized.team_name);
         return normalized;
+      }
+
+      function loadTemplateConfig() {
+        try {
+          const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+          if (!raw) return null;
+          const config = JSON.parse(raw);
+          return Array.isArray(config?.teams) ? config : null;
+        } catch (error) {
+          console.warn("模板配置读取失败", error);
+          return null;
+        }
+      }
+
+      function normalizeManagedTeam(team) {
+        const generals = (team.generals || []).map(normalizeName).filter(Boolean).slice(0, 3);
+        const skills = {};
+        generals.forEach((general) => {
+          skills[general] = (team.skills?.[general] || []).map(normalizeName).filter(Boolean).slice(0, 2);
+        });
+        return {
+          team_name: normalizeName(team.team_name) || "未命名队伍",
+          tier: normalizeName(team.tier) || "自定义",
+          note: "模板管理页配置",
+          generals,
+          skills,
+          skill_rules: team.skill_rules || {},
+        };
+      }
+
+      function applyTemplateConfig(data) {
+        const config = loadTemplateConfig();
+        if (!config?.teams?.length) return data;
+        const managedTeams = config.teams.map(normalizeManagedTeam).filter((team) => team.generals.length === 3);
+        if (!managedTeams.length) return data;
+        const managedNames = new Set(managedTeams.map((team) => team.team_name));
+        const cloned = {
+          ...data,
+          s2_strong_teams: (data.s2_strong_teams || []).map((group) => ({
+            ...group,
+            teams: (group.teams || []).filter((team) => !managedNames.has(team.team_name)),
+          })),
+        };
+        cloned.s2_strong_teams.push({
+          tier: "模板配置",
+          start_row: "admin",
+          teams: managedTeams,
+        });
+        return cloned;
       }
 
       function teamKey(generals) {
@@ -977,8 +1031,9 @@
         return uniqueSorted(splitSkillName(required).flatMap((name) => state.replacement.get(name) || []));
       }
 
-      function compatibleReplacementCandidates(required, selectedSkills, usedSkills) {
-        return replacementCandidates(required).filter((name) => selectedSkills.has(name) && !usedSkills.has(name));
+      function compatibleReplacementCandidates(required, selectedSkills, usedSkills, extraCandidates = []) {
+        const candidates = uniqueSorted([...extraCandidates, ...replacementCandidates(required)]);
+        return candidates.filter((name) => selectedSkills.has(name) && !usedSkills.has(name));
       }
 
       function replacementTooltip(skill) {
@@ -1132,9 +1187,15 @@
         return splitSkillName(required).some((name) => tagSet.has(name));
       }
 
-      function assignRequiredSkill(required, selectedSkills, usedSkills) {
-        const isCore = hasSkillTag(required, coreSkills);
-        const isImportant = hasSkillTag(required, importantSkills);
+      function skillRuleFor(team, general, required) {
+        return team.skillRules?.[general]?.[required] || {};
+      }
+
+      function assignRequiredSkill(required, selectedSkills, usedSkills, team, general) {
+        const rule = skillRuleFor(team, general, required);
+        const ruleReplacements = (rule.replacements || []).map(normalizeName).filter(Boolean);
+        const isCore = Boolean(rule.core) || hasSkillTag(required, coreSkills);
+        const isImportant = Boolean(rule.important) || hasSkillTag(required, importantSkills);
         const direct = splitSkillName(required).find((name) => selectedSkills.has(name) && !usedSkills.has(name));
         if (direct) {
           return {
@@ -1160,7 +1221,7 @@
           };
         }
 
-        const substitute = compatibleReplacementCandidates(required, selectedSkills, usedSkills)[0];
+        const substitute = compatibleReplacementCandidates(required, selectedSkills, usedSkills, ruleReplacements)[0];
         if (substitute) {
           return {
             required,
@@ -1196,7 +1257,7 @@
 
         variant.team.generals.forEach((general) => {
           assignmentsByGeneral[general] = (variant.team.skills?.[general] || []).map((required) => {
-            const assignment = assignRequiredSkill(required, selectedSkills, localUsed);
+            const assignment = assignRequiredSkill(required, selectedSkills, localUsed, variant.team, general);
             if (assignment.reserves) {
               localUsed.add(assignment.reserves);
             }
@@ -1534,7 +1595,7 @@
         try {
           const response = await fetch(DATA_URL, { cache: "no-store" });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
+          const data = applyTemplateConfig(await response.json());
           state.teams = flattenTeams(data);
           state.plans = buildCoexistPlans(data);
           state.libraryGroups = buildLibraryGroups(data);
