@@ -1157,6 +1157,7 @@
         let ownedCount = 0;
         let substituteCount = 0;
         let majorDropCount = 0;
+        let coreMissingCount = 0;
 
         variant.team.generals.forEach((general) => {
           assignmentsByGeneral[general] = (variant.team.skills?.[general] || []).map((required) => {
@@ -1167,6 +1168,7 @@
             if (assignment.status === "owned") ownedCount += 1;
             if (assignment.status === "substitute") substituteCount += 1;
             if (assignment.status === "substitute" && assignment.isImportant) majorDropCount += 1;
+            if (assignment.status === "missing" && assignment.isCore) coreMissingCount += 1;
             return assignment;
           });
         });
@@ -1177,6 +1179,7 @@
           ownedCount,
           substituteCount,
           majorDropCount,
+          coreMissingCount,
           assignedCount: ownedCount + substituteCount,
           missingCount: variant.team.requiredSkills.length - ownedCount - substituteCount,
           reservedSkills: [...localUsed].filter((name) => !usedSkills.has(name)),
@@ -1306,6 +1309,7 @@
 
           const finalVariant = bestFinalVariant(match.group, selectedSkills, usedSkills);
           if (!finalVariant) continue;
+          if (finalVariant.coreMissingCount || finalVariant.missingCount) continue;
 
           picked.push({
             ...match,
