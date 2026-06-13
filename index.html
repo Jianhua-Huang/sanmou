@@ -1347,10 +1347,10 @@
       }
 
       function pickFinalTeams(matches, selectedSkills) {
-        const picked = [];
-        const pickedKeys = new Set();
-        const usedGenerals = new Set();
-        const usedSkills = new Set();
+        const perfectPicked = [];
+        const perfectKeys = new Set();
+        const perfectUsedGenerals = new Set();
+        const perfectUsedSkills = new Set();
         const ranked = matches
           .map((match) => {
             const finalVariant = bestFinalVariant(match.group, selectedSkills, new Set());
@@ -1362,35 +1362,45 @@
           .sort(sortCandidates);
 
         for (const match of ranked) {
-          if (picked.length >= 5) break;
-          if (match.group.generals.some((name) => usedGenerals.has(name))) continue;
-
-          const finalVariant = bestFinalVariant(match.group, selectedSkills, usedSkills);
-          if (!finalVariant) continue;
-          if (picked.length >= 2 && finalVariant.missingCount) continue;
-
-          picked.push({
+          if (match.group.generals.some((name) => perfectUsedGenerals.has(name))) continue;
+          const finalVariant = bestFinalVariant(match.group, selectedSkills, perfectUsedSkills);
+          if (!finalVariant || finalVariant.missingCount || finalVariant.coreMissingCount) continue;
+          perfectPicked.push({
             ...match,
             finalVariant,
             rankScore: variantMatchScore(finalVariant),
-            usedSkillsBefore: new Set(usedSkills),
+            usedSkillsBefore: new Set(perfectUsedSkills),
           });
-          pickedKeys.add(match.group.key);
-          match.group.generals.forEach((name) => usedGenerals.add(name));
-          finalVariant.reservedSkills.forEach((name) => usedSkills.add(name));
+          perfectKeys.add(match.group.key);
+          match.group.generals.forEach((name) => perfectUsedGenerals.add(name));
+          finalVariant.reservedSkills.forEach((name) => perfectUsedSkills.add(name));
         }
 
-        const folded = ranked
-          .filter((match) => !pickedKeys.has(match.group.key))
-          .map((match) => ({
-            ...match,
-            folded: true,
-          }));
+        const imperfect = ranked
+          .filter((match) => !perfectKeys.has(match.group.key))
+          .map((match) => {
+            const finalVariant = bestFinalVariant(match.group, selectedSkills, perfectUsedSkills);
+            return finalVariant
+              ? {
+                ...match,
+                finalVariant,
+                rankScore: variantMatchScore(finalVariant),
+                folded: true,
+              }
+              : null;
+          })
+          .filter(Boolean)
+          .sort(sortCandidates);
+        const extraPerfect = imperfect.filter((match) => !match.finalVariant.missingCount && !match.finalVariant.coreMissingCount);
+        const remainingImperfect = imperfect.filter((match) => match.finalVariant.missingCount || match.finalVariant.coreMissingCount);
+        const visiblePerfect = [...perfectPicked, ...extraPerfect];
+        const visibleImperfect = visiblePerfect.length >= 2 ? [] : remainingImperfect.slice(0, 2 - visiblePerfect.length);
+        const visibleKeys = new Set([...visiblePerfect, ...visibleImperfect].map((match) => match.group.key));
+        const folded = remainingImperfect
+          .filter((match) => !visibleKeys.has(match.group.key))
+          .map((match) => ({ ...match, folded: true }));
 
-        const perfect = folded.filter((match) => !match.finalVariant.missingCount && !match.finalVariant.coreMissingCount);
-        const imperfect = folded.filter((match) => match.finalVariant.missingCount || match.finalVariant.coreMissingCount);
-
-        return { picked: [...picked, ...perfect], folded: imperfect };
+        return { picked: [...visiblePerfect, ...visibleImperfect], folded };
       }
 
       function scorePlan(plan, selectedGenerals, selectedSkills) {
