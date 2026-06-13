@@ -484,6 +484,34 @@
         display: block;
       }
 
+      .other-matches {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .other-matches > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 42px;
+        padding: 10px 14px;
+        font-weight: 700;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .other-matches > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .other-list {
+        display: grid;
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        padding: 12px;
+      }
+
       .missing {
         margin-top: 10px;
         border: 1px solid #fed7aa;
@@ -1199,6 +1227,26 @@
           )[0];
       }
 
+      function variantMatchScore(variant) {
+        if (!variant) return -Infinity;
+        const total = Math.max(variant.team.requiredSkills.length, 1);
+        const skillRatio = variant.assignedCount / total;
+        return skillRatio * 100
+          - variant.coreMissingCount * 18
+          - variant.missingCount * 8
+          - variant.majorDropCount * 3
+          - variant.team.strength * 4;
+      }
+
+      function sortCandidates(a, b) {
+        return b.rankScore - a.rankScore ||
+          b.finalVariant.assignedCount - a.finalVariant.assignedCount ||
+          a.finalVariant.coreMissingCount - b.finalVariant.coreMissingCount ||
+          a.finalVariant.missingCount - b.finalVariant.missingCount ||
+          a.finalVariant.team.strength - b.finalVariant.team.strength ||
+          a.finalVariant.team.team_name.localeCompare(b.finalVariant.team.team_name, "zh-CN");
+      }
+
       function matchTeams() {
         const selectedGenerals = getSelected("generals");
         const selectedSkills = getSelected("skills");
@@ -1207,8 +1255,8 @@
           .filter((group) => group.generals.every((name) => selectedGenerals.has(name)))
           .map((group) => scoreLibraryGroup(group, selectedSkills))
           .sort((a, b) =>
-            a.strength - b.strength ||
             b.skillScore - a.skillScore ||
+            a.strength - b.strength ||
             a.group.names[0].localeCompare(b.group.names[0], "zh-CN")
           );
 
@@ -1300,27 +1348,45 @@
 
       function pickFinalTeams(matches, selectedSkills) {
         const picked = [];
+        const pickedKeys = new Set();
         const usedGenerals = new Set();
         const usedSkills = new Set();
+        const ranked = matches
+          .map((match) => {
+            const finalVariant = bestFinalVariant(match.group, selectedSkills, new Set());
+            return finalVariant
+              ? { ...match, finalVariant, rankScore: variantMatchScore(finalVariant) }
+              : null;
+          })
+          .filter(Boolean)
+          .sort(sortCandidates);
 
-        for (const match of matches) {
-          if (picked.length >= 5) break;
+        for (const match of ranked) {
+          if (picked.length >= 2) break;
           if (match.group.generals.some((name) => usedGenerals.has(name))) continue;
 
           const finalVariant = bestFinalVariant(match.group, selectedSkills, usedSkills);
           if (!finalVariant) continue;
-          if (finalVariant.coreMissingCount || finalVariant.missingCount) continue;
 
           picked.push({
             ...match,
             finalVariant,
+            rankScore: variantMatchScore(finalVariant),
             usedSkillsBefore: new Set(usedSkills),
           });
+          pickedKeys.add(match.group.key);
           match.group.generals.forEach((name) => usedGenerals.add(name));
           finalVariant.reservedSkills.forEach((name) => usedSkills.add(name));
         }
 
-        return picked;
+        const folded = ranked
+          .filter((match) => !pickedKeys.has(match.group.key))
+          .map((match) => ({
+            ...match,
+            folded: true,
+          }));
+
+        return { picked, folded };
       }
 
       function scorePlan(plan, selectedGenerals, selectedSkills) {
@@ -1371,45 +1437,63 @@
           .sort((a, b) => a.team.strength - b.team.strength || a.team.team_name.localeCompare(b.team.team_name, "zh-CN"));
       }
 
-      function renderResults(matches) {
-        if (!matches.length) {
+      function renderMatch(match) {
+        const group = match.group;
+        const variant = match.finalVariant;
+        const team = variant.team;
+        const score = `战法 ${variant.assignedCount}/${team.requiredSkills.length}`;
+        const rows = team.generals.map((general) => {
+          const assignments = variant.assignmentsByGeneral[general] || [];
+          return `
+            <div class="general-row">
+              <div class="general-name">${escapeHtml(general)}</div>
+              <div class="skill-list">${assignments.map(assignmentChip).join("")}</div>
+            </div>
+          `;
+        }).join("");
+        const summary = [
+          variant.substituteCount ? `平替 ${variant.substituteCount} 个` : "",
+          variant.majorDropCount ? `强度大降 ${variant.majorDropCount} 个` : "",
+          variant.coreMissingCount ? `缺核心 ${variant.coreMissingCount} 个` : "",
+          variant.missingCount ? `缺失 ${variant.missingCount} 个` : "",
+        ].filter(Boolean).join(" · ");
+
+        return `
+          <article class="match">
+            <div class="match-top">
+              <div>
+                <h3>${escapeHtml(team.team_name)}</h3>
+                <div class="small">${group.generals.map(escapeHtml).join("、")}${summary ? ` · ${summary}` : ""}</div>
+              </div>
+              <div class="score">${score}</div>
+            </div>
+            <div class="rows">${rows}</div>
+          </article>
+        `;
+      }
+
+      function renderResults(result) {
+        const matches = result.picked || [];
+        const folded = result.folded || [];
+        if (!matches.length && !folded.length) {
           $("results").innerHTML = '<div class="empty">没有三名武将都齐的队伍。缺武将的队伍不会显示。</div>';
           return;
         }
 
-        $("results").innerHTML = matches.map((match) => {
-          const group = match.group;
-          const variant = match.finalVariant;
-          const team = variant.team;
-          const score = `战法 ${variant.assignedCount}/${team.requiredSkills.length}`;
-          const rows = team.generals.map((general) => {
-            const assignments = variant.assignmentsByGeneral[general] || [];
-            return `
-              <div class="general-row">
-                <div class="general-name">${escapeHtml(general)}</div>
-                <div class="skill-list">${assignments.map(assignmentChip).join("")}</div>
-              </div>
-            `;
-          }).join("");
-          const summary = [
-            variant.substituteCount ? `平替 ${variant.substituteCount} 个` : "",
-            variant.majorDropCount ? `强度大降 ${variant.majorDropCount} 个` : "",
-            variant.missingCount ? `缺失 ${variant.missingCount} 个` : "",
-          ].filter(Boolean).join(" · ");
+        const visibleHtml = matches.map(renderMatch).join("");
+        const foldedHtml = folded.length
+          ? `
+            <details class="other-matches">
+              <summary>
+                <span>其他武将齐全候选</span>
+                <span class="group-count">${folded.length}</span>
+              </summary>
+              <div class="other-list">${folded.map(renderMatch).join("")}</div>
+            </details>
+          `
+          : "";
 
-          return `
-            <article class="match">
-              <div class="match-top">
-                <div>
-                  <h3>${escapeHtml(team.team_name)}</h3>
-                  <div class="small">${group.generals.map(escapeHtml).join("、")}${summary ? ` · ${summary}` : ""}</div>
-                </div>
-                <div class="score">${score}</div>
-              </div>
-              <div class="rows">${rows}</div>
-            </article>
-          `;
-        }).join("");
+        $("results").innerHTML = visibleHtml + foldedHtml;
       }
 
       async function boot() {
