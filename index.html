@@ -443,6 +443,12 @@
         color: var(--warn);
       }
 
+      .skill-chip.major-drop {
+        border-color: #fb7185;
+        background: #fff1f2;
+        color: #be123c;
+      }
+
       .skill-chip.blocked-skill {
         border-color: #f87171;
         background: #fef2f2;
@@ -634,6 +640,24 @@
         锐不可当: "增伤/追击输出替代。",
         如有神助: "辅助增益替代。",
       };
+
+      const coreSkills = new Set([
+        "指点乾坤",
+      ]);
+
+      const importantSkills = new Set([
+        "胜敌益强",
+        "王佐之才",
+        "如有神助",
+        "披坚执锐",
+        "摧坚克难",
+        "锐不可当",
+        "兵贵神速",
+        "辕门射戟",
+        "韬光养晦",
+        "巧利天灾",
+        "狂风大作",
+      ]);
 
       const $ = (id) => document.getElementById(id);
 
@@ -919,22 +943,7 @@
       }
 
       function compatibleReplacementCandidates(required, selectedSkills, usedSkills) {
-        const directOptions = splitSkillName(required);
-        const directSet = new Set(directOptions);
-        const explicit = replacementCandidates(required).filter((name) => selectedSkills.has(name) && !usedSkills.has(name));
-        const explicitSet = new Set(explicit);
-        const metaPairs = directOptions
-          .map((name) => state.skillMeta[name])
-          .filter(Boolean)
-          .map((meta) => `${meta.activation_type || ""}||${meta.effect_type || ""}`);
-        const metaSet = new Set(metaPairs);
-        const compatible = state.skills.filter((name) => {
-          if (!selectedSkills.has(name) || usedSkills.has(name) || directSet.has(name) || explicitSet.has(name)) return false;
-          const meta = state.skillMeta[name];
-          if (!meta) return false;
-          return metaSet.has(`${meta.activation_type || ""}||${meta.effect_type || ""}`);
-        });
-        return [...explicit, ...compatible.sort((a, b) => a.localeCompare(b, "zh-CN"))];
+        return replacementCandidates(required).filter((name) => selectedSkills.has(name) && !usedSkills.has(name));
       }
 
       function replacementTooltip(skill) {
@@ -957,10 +966,16 @@
         if (assignment.status === "substitute") {
           lines.push(`原战法: ${assignment.required}`);
         }
+        if (assignment.isCore) {
+          lines.push("核心战法，不可替换。缺失或被占用时该队强度不成立。");
+        }
+        if (assignment.isImportant && assignment.status === "substitute") {
+          lines.push("重点战法已替换，队伍强度会大幅下降。");
+        }
         if (assignment.reason) {
           lines.push(assignment.reason);
         }
-        if (candidates.length) {
+        if (!assignment.isCore && candidates.length) {
           lines.push("可用平替:");
           candidates.forEach((name) => {
             lines.push(`${name}: ${skillEffects[name] || "攻略替代链推荐，按队伍缺口补位。"}`);
@@ -974,7 +989,7 @@
           return skillChip(assignment.skill, "", "", false);
         }
         if (assignment.status === "substitute") {
-          return skillChip(assignment.skill, "substitute", assignmentTooltip(assignment), false);
+          return skillChip(assignment.skill, assignment.isImportant ? "substitute major-drop" : "substitute", assignmentTooltip(assignment), false);
         }
         return skillChip(assignment.required, "blocked-skill", assignmentTooltip(assignment), false);
       }
@@ -1078,7 +1093,13 @@
         };
       }
 
+      function hasSkillTag(required, tagSet) {
+        return splitSkillName(required).some((name) => tagSet.has(name));
+      }
+
       function assignRequiredSkill(required, selectedSkills, usedSkills) {
+        const isCore = hasSkillTag(required, coreSkills);
+        const isImportant = hasSkillTag(required, importantSkills);
         const direct = splitSkillName(required).find((name) => selectedSkills.has(name) && !usedSkills.has(name));
         if (direct) {
           return {
@@ -1086,21 +1107,36 @@
             skill: direct,
             status: "owned",
             reserves: direct,
+            isCore,
+            isImportant,
           };
         }
 
         const directOwned = splitSkillName(required).find((name) => selectedSkills.has(name) && usedSkills.has(name));
+        if (isCore) {
+          return {
+            required,
+            skill: required,
+            status: "missing",
+            reserves: "",
+            isCore,
+            isImportant,
+            reason: directOwned ? `${directOwned} 已被更高 T 队伍占用` : "未选择核心战法",
+          };
+        }
+
         const substitute = compatibleReplacementCandidates(required, selectedSkills, usedSkills)[0];
         if (substitute) {
-          const isGuideReplacement = replacementCandidates(required).includes(substitute);
           return {
             required,
             skill: substitute,
             status: "substitute",
             reserves: substitute,
+            isCore,
+            isImportant,
             reason: directOwned
-              ? `${directOwned} 已被更高 T 队伍占用，${isGuideReplacement ? "使用攻略平替" : "使用同类型平替"}`
-              : `未选择原战法，${isGuideReplacement ? "使用攻略平替" : "使用同类型平替"}`,
+              ? `${directOwned} 已被更高 T 队伍占用，使用攻略平替`
+              : "未选择原战法，使用攻略平替",
           };
         }
 
@@ -1109,6 +1145,8 @@
           skill: required,
           status: "missing",
           reserves: "",
+          isCore,
+          isImportant,
           reason: directOwned ? `${directOwned} 已被更高 T 队伍占用，且没有可用平替` : "未选择原战法，且没有可用平替",
         };
       }
@@ -1118,6 +1156,7 @@
         const localUsed = new Set(usedSkills);
         let ownedCount = 0;
         let substituteCount = 0;
+        let majorDropCount = 0;
 
         variant.team.generals.forEach((general) => {
           assignmentsByGeneral[general] = (variant.team.skills?.[general] || []).map((required) => {
@@ -1127,6 +1166,7 @@
             }
             if (assignment.status === "owned") ownedCount += 1;
             if (assignment.status === "substitute") substituteCount += 1;
+            if (assignment.status === "substitute" && assignment.isImportant) majorDropCount += 1;
             return assignment;
           });
         });
@@ -1136,6 +1176,7 @@
           assignmentsByGeneral,
           ownedCount,
           substituteCount,
+          majorDropCount,
           assignedCount: ownedCount + substituteCount,
           missingCount: variant.team.requiredSkills.length - ownedCount - substituteCount,
           reservedSkills: [...localUsed].filter((name) => !usedSkills.has(name)),
@@ -1348,6 +1389,7 @@
           }).join("");
           const summary = [
             variant.substituteCount ? `平替 ${variant.substituteCount} 个` : "",
+            variant.majorDropCount ? `强度大降 ${variant.majorDropCount} 个` : "",
             variant.missingCount ? `缺失 ${variant.missingCount} 个` : "",
           ].filter(Boolean).join(" · ");
 
