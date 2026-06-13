@@ -319,6 +319,13 @@
         font-size: 17px;
       }
 
+      .copy-team {
+        border-color: #cbd8d5;
+        padding: 5px 9px;
+        background: #fff;
+        font-size: 12px;
+      }
+
       .score {
         min-width: 150px;
         align-self: start;
@@ -608,7 +615,7 @@
 
         <section class="results">
           <div class="results-head">
-            <h2>匹配结果</h2>
+            <h2>推荐配队</h2>
             <div class="small" id="selectedCount">未选择</div>
           </div>
           <div class="result-list" id="results">
@@ -1247,6 +1254,16 @@
           a.finalVariant.team.team_name.localeCompare(b.finalVariant.team.team_name, "zh-CN");
       }
 
+      function teamCopyText(match) {
+        const variant = match.finalVariant;
+        const lines = [variant.team.team_name];
+        variant.team.generals.forEach((general) => {
+          const skills = (variant.assignmentsByGeneral[general] || []).map((assignment) => assignment.skill || assignment.required);
+          lines.push(`${general}: ${skills.join("、")}`);
+        });
+        return lines.join("\n");
+      }
+
       function matchTeams() {
         const selectedGenerals = getSelected("generals");
         const selectedSkills = getSelected("skills");
@@ -1479,7 +1496,10 @@
                 <h3>${escapeHtml(team.team_name)}</h3>
                 <div class="small">${group.generals.map(escapeHtml).join("、")}${summary ? ` · ${summary}` : ""}</div>
               </div>
-              <div class="score">${score}</div>
+              <div>
+                <div class="score">${score}</div>
+                <button class="copy-team" type="button" data-copy="${escapeHtml(teamCopyText(match))}">复制配置</button>
+              </div>
             </div>
             <div class="rows">${rows}</div>
           </article>
@@ -1499,7 +1519,7 @@
           ? `
             <details class="other-matches">
               <summary>
-                <span>其他武将齐全候选</span>
+                <span>备选队伍（缺战法/冲突）</span>
                 <span class="group-count">${folded.length}</span>
               </summary>
               <div class="other-list">${folded.map(renderMatch).join("")}</div>
@@ -1550,6 +1570,15 @@
         });
       });
       document.addEventListener("click", (event) => {
+        const copyButton = event.target.closest(".copy-team");
+        if (copyButton) {
+          navigator.clipboard?.writeText(copyButton.dataset.copy || "");
+          copyButton.textContent = "已复制";
+          setTimeout(() => {
+            copyButton.textContent = "复制配置";
+          }, 1200);
+          return;
+        }
         const chip = event.target.closest(".skill-chip.has-tip");
         document.querySelectorAll(".skill-chip.tip-open").forEach((item) => {
           if (item !== chip) item.classList.remove("tip-open");
