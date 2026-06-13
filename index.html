@@ -1362,11 +1362,12 @@
           .sort(sortCandidates);
 
         for (const match of ranked) {
-          if (picked.length >= 2) break;
+          if (picked.length >= 5) break;
           if (match.group.generals.some((name) => usedGenerals.has(name))) continue;
 
           const finalVariant = bestFinalVariant(match.group, selectedSkills, usedSkills);
           if (!finalVariant) continue;
+          if (picked.length >= 2 && finalVariant.missingCount) continue;
 
           picked.push({
             ...match,
@@ -1386,7 +1387,10 @@
             folded: true,
           }));
 
-        return { picked, folded };
+        const perfect = folded.filter((match) => !match.finalVariant.missingCount && !match.finalVariant.coreMissingCount);
+        const imperfect = folded.filter((match) => match.finalVariant.missingCount || match.finalVariant.coreMissingCount);
+
+        return { picked: [...picked, ...perfect], folded: imperfect };
       }
 
       function scorePlan(plan, selectedGenerals, selectedSkills) {
