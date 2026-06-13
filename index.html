@@ -443,6 +443,12 @@
         color: var(--warn);
       }
 
+      .skill-chip.blocked-skill {
+        border-color: #f87171;
+        background: #fef2f2;
+        color: #b91c1c;
+      }
+
       .skill-chip.has-tip::after {
         position: absolute;
         left: 0;
@@ -465,6 +471,10 @@
       }
 
       .skill-chip.has-tip:hover::after {
+        display: block;
+      }
+
+      .skill-chip.has-tip.tip-open::after {
         display: block;
       }
 
@@ -904,9 +914,31 @@
         return null;
       }
 
+      function replacementCandidates(required) {
+        return uniqueSorted(splitSkillName(required).flatMap((name) => state.replacement.get(name) || []));
+      }
+
+      function compatibleReplacementCandidates(required, selectedSkills, usedSkills) {
+        const directOptions = splitSkillName(required);
+        const directSet = new Set(directOptions);
+        const explicit = replacementCandidates(required).filter((name) => selectedSkills.has(name) && !usedSkills.has(name));
+        const explicitSet = new Set(explicit);
+        const metaPairs = directOptions
+          .map((name) => state.skillMeta[name])
+          .filter(Boolean)
+          .map((meta) => `${meta.activation_type || ""}||${meta.effect_type || ""}`);
+        const metaSet = new Set(metaPairs);
+        const compatible = state.skills.filter((name) => {
+          if (!selectedSkills.has(name) || usedSkills.has(name) || directSet.has(name) || explicitSet.has(name)) return false;
+          const meta = state.skillMeta[name];
+          if (!meta) return false;
+          return metaSet.has(`${meta.activation_type || ""}||${meta.effect_type || ""}`);
+        });
+        return [...explicit, ...compatible.sort((a, b) => a.localeCompare(b, "zh-CN"))];
+      }
+
       function replacementTooltip(skill) {
-        const candidates = splitSkillName(skill).flatMap((name) => state.replacement.get(name) || []);
-        const unique = uniqueSorted(candidates);
+        const unique = replacementCandidates(skill);
         if (!unique.length) return "";
         const lines = unique.map((name) => `${name}: ${skillEffects[name] || "攻略替代链推荐，按队伍缺口补位。"}`);
         return `下位替代\n${lines.join("\n")}`;
@@ -915,8 +947,36 @@
       function skillChip(skill, extraClass = "", tooltipOverride = "", showDefaultTooltip = true) {
         const tooltip = tooltipOverride || (showDefaultTooltip ? replacementTooltip(skill) : "");
         const classes = ["skill-chip", extraClass, tooltip ? "has-tip" : ""].filter(Boolean).join(" ");
-        const tipAttr = tooltip ? ` data-tooltip="${escapeHtml(tooltip)}"` : "";
+        const tipAttr = tooltip ? ` data-tooltip="${escapeHtml(tooltip)}" tabindex="0" role="button"` : "";
         return `<span class="${classes}"${tipAttr}>${escapeHtml(skill)}</span>`;
+      }
+
+      function assignmentTooltip(assignment) {
+        const candidates = replacementCandidates(assignment.required);
+        const lines = [];
+        if (assignment.status === "substitute") {
+          lines.push(`原战法: ${assignment.required}`);
+        }
+        if (assignment.reason) {
+          lines.push(assignment.reason);
+        }
+        if (candidates.length) {
+          lines.push("可用平替:");
+          candidates.forEach((name) => {
+            lines.push(`${name}: ${skillEffects[name] || "攻略替代链推荐，按队伍缺口补位。"}`);
+          });
+        }
+        return lines.join("\n");
+      }
+
+      function assignmentChip(assignment) {
+        if (assignment.status === "owned") {
+          return skillChip(assignment.skill, "", "", false);
+        }
+        if (assignment.status === "substitute") {
+          return skillChip(assignment.skill, "substitute", assignmentTooltip(assignment), false);
+        }
+        return skillChip(assignment.required, "blocked-skill", assignmentTooltip(assignment), false);
       }
 
       function teamSkillChip(skill, selectedSkills) {
@@ -1018,6 +1078,83 @@
         };
       }
 
+      function assignRequiredSkill(required, selectedSkills, usedSkills) {
+        const direct = splitSkillName(required).find((name) => selectedSkills.has(name) && !usedSkills.has(name));
+        if (direct) {
+          return {
+            required,
+            skill: direct,
+            status: "owned",
+            reserves: direct,
+          };
+        }
+
+        const directOwned = splitSkillName(required).find((name) => selectedSkills.has(name) && usedSkills.has(name));
+        const substitute = compatibleReplacementCandidates(required, selectedSkills, usedSkills)[0];
+        if (substitute) {
+          const isGuideReplacement = replacementCandidates(required).includes(substitute);
+          return {
+            required,
+            skill: substitute,
+            status: "substitute",
+            reserves: substitute,
+            reason: directOwned
+              ? `${directOwned} 已被更高 T 队伍占用，${isGuideReplacement ? "使用攻略平替" : "使用同类型平替"}`
+              : `未选择原战法，${isGuideReplacement ? "使用攻略平替" : "使用同类型平替"}`,
+          };
+        }
+
+        return {
+          required,
+          skill: required,
+          status: "missing",
+          reserves: "",
+          reason: directOwned ? `${directOwned} 已被更高 T 队伍占用，且没有可用平替` : "未选择原战法，且没有可用平替",
+        };
+      }
+
+      function assignVariant(variant, selectedSkills, usedSkills) {
+        const assignmentsByGeneral = {};
+        const localUsed = new Set(usedSkills);
+        let ownedCount = 0;
+        let substituteCount = 0;
+
+        variant.team.generals.forEach((general) => {
+          assignmentsByGeneral[general] = (variant.team.skills?.[general] || []).map((required) => {
+            const assignment = assignRequiredSkill(required, selectedSkills, localUsed);
+            if (assignment.reserves) {
+              localUsed.add(assignment.reserves);
+            }
+            if (assignment.status === "owned") ownedCount += 1;
+            if (assignment.status === "substitute") substituteCount += 1;
+            return assignment;
+          });
+        });
+
+        return {
+          ...variant,
+          assignmentsByGeneral,
+          ownedCount,
+          substituteCount,
+          assignedCount: ownedCount + substituteCount,
+          missingCount: variant.team.requiredSkills.length - ownedCount - substituteCount,
+          reservedSkills: [...localUsed].filter((name) => !usedSkills.has(name)),
+        };
+      }
+
+      function bestFinalVariant(group, selectedSkills, usedSkills) {
+        return group.variants
+          .filter((variant) => variant.type === "strong")
+          .map((variant) => assignVariant(variant, selectedSkills, usedSkills))
+          .sort((a, b) =>
+            b.assignedCount - a.assignedCount ||
+            b.ownedCount - a.ownedCount ||
+            a.substituteCount - b.substituteCount ||
+            a.team.strength - b.team.strength ||
+            a.team.team_name.localeCompare(b.team.team_name, "zh-CN")
+          )[0];
+      }
+
       function matchTeams() {
         const selectedGenerals = getSelected("generals");
         const selectedSkills = getSelected("skills");
@@ -1026,12 +1163,12 @@
           .filter((group) => group.generals.every((name) => selectedGenerals.has(name)))
           .map((group) => scoreLibraryGroup(group, selectedSkills))
           .sort((a, b) =>
-            b.skillScore - a.skillScore ||
             a.strength - b.strength ||
+            b.skillScore - a.skillScore ||
             a.group.names[0].localeCompare(b.group.names[0], "zh-CN")
           );
 
-        renderResults(pickUniqueLibraryGroups(matches, selectedSkills));
+        renderResults(pickFinalTeams(matches, selectedSkills));
       }
 
       function preferredSkill(required, selectedSkills, usedSkills) {
@@ -1117,6 +1254,30 @@
         return picked;
       }
 
+      function pickFinalTeams(matches, selectedSkills) {
+        const picked = [];
+        const usedGenerals = new Set();
+        const usedSkills = new Set();
+
+        for (const match of matches) {
+          if (picked.length >= 5) break;
+          if (match.group.generals.some((name) => usedGenerals.has(name))) continue;
+
+          const finalVariant = bestFinalVariant(match.group, selectedSkills, usedSkills);
+          if (!finalVariant) continue;
+
+          picked.push({
+            ...match,
+            finalVariant,
+            usedSkillsBefore: new Set(usedSkills),
+          });
+          match.group.generals.forEach((name) => usedGenerals.add(name));
+          finalVariant.reservedSkills.forEach((name) => usedSkills.add(name));
+        }
+
+        return picked;
+      }
+
       function scorePlan(plan, selectedGenerals, selectedSkills) {
         const matches = plan.teams.map((team) => scoreTeam(team, selectedGenerals, selectedSkills));
         const planUsedSkills = new Set();
@@ -1172,23 +1333,34 @@
         }
 
         $("results").innerHTML = matches.map((match) => {
-          const selectedSkills = getSelected("skills");
           const group = match.group;
-          const strongCount = group.variants.filter((variant) => variant.type === "strong").length;
-          const altCount = group.variants.filter((variant) => variant.type === "coexist").length;
-          const score = `最佳战法 ${match.best.matchedSkills.length}/${match.best.team.requiredSkills.length}`;
-          const variants = match.variants.map((variant) => renderVariant(variant, selectedSkills)).join("");
+          const variant = match.finalVariant;
+          const team = variant.team;
+          const score = `战法 ${variant.assignedCount}/${team.requiredSkills.length}`;
+          const rows = team.generals.map((general) => {
+            const assignments = variant.assignmentsByGeneral[general] || [];
+            return `
+              <div class="general-row">
+                <div class="general-name">${escapeHtml(general)}</div>
+                <div class="skill-list">${assignments.map(assignmentChip).join("")}</div>
+              </div>
+            `;
+          }).join("");
+          const summary = [
+            variant.substituteCount ? `平替 ${variant.substituteCount} 个` : "",
+            variant.missingCount ? `缺失 ${variant.missingCount} 个` : "",
+          ].filter(Boolean).join(" · ");
 
           return `
             <article class="match">
               <div class="match-top">
                 <div>
-                  <h3>${group.names.map(escapeHtml).join(" / ")}</h3>
-                  <div class="small">${group.generals.map(escapeHtml).join("、")} · 强队组合 ${strongCount} 套 · 补充组合 ${altCount} 套</div>
+                  <h3>${escapeHtml(team.team_name)}</h3>
+                  <div class="small">${group.generals.map(escapeHtml).join("、")}${summary ? ` · ${summary}` : ""}</div>
                 </div>
                 <div class="score">${score}</div>
               </div>
-              <div class="variant-list">${variants}</div>
+              <div class="rows">${rows}</div>
             </article>
           `;
         }).join("");
@@ -1232,6 +1404,15 @@
         button.addEventListener("click", () => {
           setGroupChecked(button.dataset.target, button.dataset.action === "select");
         });
+      });
+      document.addEventListener("click", (event) => {
+        const chip = event.target.closest(".skill-chip.has-tip");
+        document.querySelectorAll(".skill-chip.tip-open").forEach((item) => {
+          if (item !== chip) item.classList.remove("tip-open");
+        });
+        if (chip) {
+          chip.classList.toggle("tip-open");
+        }
       });
       $("generalSearch").addEventListener("input", () => filterOptions("generalSearch", "generalList"));
       $("skillSearch").addEventListener("input", () => filterOptions("skillSearch", "skillList"));
