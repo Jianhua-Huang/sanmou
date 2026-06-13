@@ -1461,6 +1461,44 @@
           }
         }
       ]
+    },
+    {
+      "tier": "S1补充",
+      "start_row": 0,
+      "teams": [
+        {
+          "team_name": "T0.5 貂梁盾",
+          "tier": "S1补充",
+          "note": "S1强队合集补充队伍",
+          "generals": [
+            "貂蝉",
+            "蔡文姬",
+            "张梁"
+          ],
+          "formation": "箕形阵",
+          "skills": {
+            "貂蝉": [
+              "百战不殆",
+              "忘私相助"
+            ],
+            "蔡文姬": [
+              "清风驱疾",
+              "一计决胜"
+            ],
+            "张梁": [
+              "势如破竹",
+              "战八方"
+            ]
+          },
+          "unit": {},
+          "specialization": {},
+          "books": {},
+          "attributes": {},
+          "equipment": {},
+          "mount": {},
+          "points": {}
+        }
+      ]
     }
   ],
   "s2_coexist_plans": [
@@ -3813,5 +3851,440 @@
       }
     ]
   },
-  "source": "S2????.xlsx"
+  "source": "S2????.xlsx",
+  "metadata": {
+    "generals": {
+      "关羽": {
+        "camp": "蜀",
+        "lookup": "关羽"
+      },
+      "典韦": {
+        "camp": "魏",
+        "lookup": "典韦"
+      },
+      "刘备": {
+        "camp": "蜀",
+        "lookup": "刘备"
+      },
+      "吕布": {
+        "camp": "群",
+        "lookup": "吕布"
+      },
+      "周瑜": {
+        "camp": "吴",
+        "lookup": "周瑜"
+      },
+      "夏侯惇": {
+        "camp": "魏",
+        "lookup": "夏侯惇"
+      },
+      "大乔": {
+        "camp": "吴",
+        "lookup": "大乔"
+      },
+      "孙尚香": {
+        "camp": "吴",
+        "lookup": "孙尚香"
+      },
+      "孙权": {
+        "camp": "吴",
+        "lookup": "孙权"
+      },
+      "小乔": {
+        "camp": "吴",
+        "lookup": "小乔"
+      },
+      "张辽": {
+        "camp": "魏",
+        "lookup": "张辽"
+      },
+      "张飞": {
+        "camp": "蜀",
+        "lookup": "张飞"
+      },
+      "徐盛": {
+        "camp": "吴",
+        "lookup": "徐盛"
+      },
+      "曹仁": {
+        "camp": "魏",
+        "lookup": "曹仁"
+      },
+      "曹操": {
+        "camp": "魏",
+        "lookup": "曹操"
+      },
+      "甄姬": {
+        "camp": "魏",
+        "lookup": "甄姬"
+      },
+      "田丰": {
+        "camp": "群",
+        "lookup": "田丰"
+      },
+      "英雄孙坚": {
+        "camp": "吴",
+        "lookup": "英雄孙坚"
+      },
+      "英雄董卓": {
+        "camp": "群",
+        "lookup": "英雄董卓"
+      },
+      "荀彧": {
+        "camp": "魏",
+        "lookup": "荀彧"
+      },
+      "董卓": {
+        "camp": "群",
+        "lookup": "董卓"
+      },
+      "袁绍": {
+        "camp": "群",
+        "lookup": "袁绍"
+      },
+      "话本孙坚": {
+        "camp": "吴",
+        "lookup": "话本孙坚"
+      },
+      "话本董卓": {
+        "camp": "群",
+        "lookup": "话本董卓"
+      },
+      "诸葛": {
+        "camp": "蜀",
+        "lookup": "诸葛"
+      },
+      "貂蝉": {
+        "camp": "群",
+        "lookup": "貂蝉"
+      },
+      "贾诩": {
+        "camp": "群",
+        "lookup": "贾诩"
+      },
+      "赵云": {
+        "camp": "蜀",
+        "lookup": "赵云"
+      },
+      "邓艾": {
+        "camp": "魏",
+        "lookup": "邓艾"
+      },
+      "陆逊": {
+        "camp": "吴",
+        "lookup": "陆逊"
+      },
+      "陈宫": {
+        "camp": "群",
+        "lookup": "陈宫"
+      },
+      "马云禄": {
+        "camp": "蜀",
+        "lookup": "马云禄"
+      },
+      "马超": {
+        "camp": "蜀",
+        "lookup": "马超"
+      },
+      "鲁肃": {
+        "camp": "吴",
+        "lookup": "鲁肃"
+      },
+      "黄月英": {
+        "camp": "蜀",
+        "lookup": "黄月英"
+      },
+      "黄盖": {
+        "camp": "吴",
+        "lookup": "黄盖"
+      },
+      "蔡文姬": {
+        "camp": "群"
+      },
+      "张梁": {
+        "camp": "群"
+      }
+    },
+    "skills": {
+      "万夫莫当": {
+        "activation_type": "被动",
+        "effect_type": "兵刃",
+        "lookup": "万夫莫当"
+      },
+      "乘间投隙": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "乘间投隙"
+      },
+      "以静制动": {
+        "activation_type": "被动",
+        "effect_type": "防御",
+        "lookup": "以静制动"
+      },
+      "兵贵神速": {
+        "activation_type": "追击",
+        "effect_type": "兵刃",
+        "lookup": "兵贵神速"
+      },
+      "出其不意": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "出其不意"
+      },
+      "势如破竹": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "势如破竹"
+      },
+      "勇冠三军": {
+        "activation_type": "被动",
+        "effect_type": "兵刃",
+        "lookup": "勇冠三军"
+      },
+      "咏歌尝酒": {
+        "activation_type": "主动",
+        "effect_type": "治疗",
+        "lookup": "咏歌尝酒"
+      },
+      "固若金汤": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "固若金汤"
+      },
+      "坚壁清野": {
+        "activation_type": "主动",
+        "effect_type": "防御",
+        "lookup": "坚壁清野"
+      },
+      "坚如磐石": {
+        "activation_type": "主动",
+        "effect_type": "防御",
+        "lookup": "坚如磐石"
+      },
+      "奇正相生": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "奇正相生"
+      },
+      "奇门遁甲": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "奇门遁甲"
+      },
+      "如有神助": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "如有神助"
+      },
+      "威名显赫": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "威名显赫"
+      },
+      "巧利天灾": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "巧利天灾"
+      },
+      "忘私": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "忘私"
+      },
+      "忘私相助": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "忘私相助"
+      },
+      "战八方": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "战八方"
+      },
+      "披坚": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "披坚"
+      },
+      "披坚执锐": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "披坚执锐"
+      },
+      "指点": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "指点"
+      },
+      "指点乾坤": {
+        "activation_type": "主动",
+        "effect_type": "文武",
+        "lookup": "指点乾坤"
+      },
+      "摧坚克难": {
+        "activation_type": "追击",
+        "effect_type": "兵刃",
+        "lookup": "摧坚克难"
+      },
+      "料事如神": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "料事如神"
+      },
+      "断敌粮道": {
+        "activation_type": "指挥",
+        "effect_type": "谋略",
+        "lookup": "断敌粮道"
+      },
+      "无难之志": {
+        "activation_type": "主动",
+        "effect_type": "防御",
+        "lookup": "无难之志"
+      },
+      "来好息师": {
+        "activation_type": "被动",
+        "effect_type": "治疗",
+        "lookup": "来好息师"
+      },
+      "横征暴敛": {
+        "activation_type": "被动",
+        "effect_type": "防御",
+        "lookup": "横征暴敛"
+      },
+      "水淹七军": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "水淹七军"
+      },
+      "清风驱疾": {
+        "activation_type": "主动",
+        "effect_type": "治疗",
+        "lookup": "清风驱疾"
+      },
+      "烈火焚营": {
+        "activation_type": "主动",
+        "effect_type": "谋略",
+        "lookup": "烈火焚营"
+      },
+      "狂风大作": {
+        "activation_type": "指挥",
+        "effect_type": "谋略",
+        "lookup": "狂风大作"
+      },
+      "王佐之才": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "王佐之才"
+      },
+      "百战": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "百战"
+      },
+      "百战不殆": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "百战不殆"
+      },
+      "知人善任": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "知人善任"
+      },
+      "破军袭敌": {
+        "activation_type": "主动",
+        "effect_type": "兵刃",
+        "lookup": "破军袭敌"
+      },
+      "胜敌益强": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "胜敌益强"
+      },
+      "舍生": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "舍生"
+      },
+      "舍生取义": {
+        "activation_type": "指挥",
+        "effect_type": "辅助",
+        "lookup": "舍生取义"
+      },
+      "蓄势": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "蓄势"
+      },
+      "蓄势待发": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "蓄势待发"
+      },
+      "谈笑诛心": {
+        "activation_type": "被动",
+        "effect_type": "谋略",
+        "lookup": "谈笑诛心"
+      },
+      "轻装驰援": {
+        "activation_type": "追击",
+        "effect_type": "防御",
+        "lookup": "轻装驰援"
+      },
+      "辕门射戟": {
+        "activation_type": "追击",
+        "effect_type": "兵刃",
+        "lookup": "辕门射戟"
+      },
+      "避其→铸甲": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "避其→铸甲"
+      },
+      "避其锐气": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "避其锐气"
+      },
+      "铁骑横冲": {
+        "activation_type": "追击",
+        "effect_type": "兵刃",
+        "lookup": "铁骑横冲"
+      },
+      "铸甲": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "铸甲"
+      },
+      "铸甲销戈": {
+        "activation_type": "指挥",
+        "effect_type": "防御",
+        "lookup": "铸甲销戈"
+      },
+      "锐不可当": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "锐不可当"
+      },
+      "青囊急救": {
+        "activation_type": "主动",
+        "effect_type": "治疗",
+        "lookup": "青囊急救"
+      },
+      "韬光养晦": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "韬光养晦"
+      },
+      "骁勇之姿": {
+        "activation_type": "被动",
+        "effect_type": "辅助",
+        "lookup": "骁勇之姿"
+      },
+      "一计决胜": {
+        "activation_type": "主动",
+        "effect_type": "谋略"
+      }
+    }
+  }
 }

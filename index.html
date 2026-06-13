@@ -192,6 +192,58 @@
         padding: 14px;
       }
 
+      .group-list {
+        display: grid;
+        gap: 10px;
+        max-height: 290px;
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .group,
+      .subgroup {
+        border: 1px solid #e3ebe8;
+        border-radius: 6px;
+        background: #fff;
+      }
+
+      .group > summary,
+      .subgroup > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 34px;
+        padding: 7px 9px;
+        color: var(--text);
+        font-weight: 700;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .group > summary::-webkit-details-marker,
+      .subgroup > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .group-count {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .group .check-grid,
+      .subgroup .check-grid {
+        max-height: none;
+        overflow: visible;
+        padding: 0 9px 10px;
+      }
+
+      .subgroup-wrap {
+        display: grid;
+        gap: 8px;
+        padding: 0 9px 10px;
+      }
+
       label.option {
         display: flex;
         align-items: center;
@@ -300,6 +352,52 @@
         padding: 8px 9px;
         background: #fbfcfc;
         line-height: 1.5;
+      }
+
+      .variant-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .variant {
+        border: 1px solid #e5ebe8;
+        border-radius: 6px;
+        padding: 10px;
+        background: #fbfcfc;
+      }
+
+      .variant.alt {
+        border-color: #f3d2ae;
+        background: #fffaf3;
+      }
+
+      .variant-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .variant-title {
+        font-weight: 700;
+      }
+
+      .variant-tag {
+        border: 1px solid #cbd8d5;
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--muted);
+        background: #fff;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .variant.alt .variant-tag {
+        border-color: #f3bd8d;
+        color: var(--warn);
+        background: #fff7ed;
       }
 
       .general-name {
@@ -481,8 +579,11 @@
       const state = {
         teams: [],
         plans: [],
+        libraryGroups: [],
         generals: [],
         skills: [],
+        generalMeta: {},
+        skillMeta: {},
         replacement: new Map(),
       };
 
@@ -571,6 +672,63 @@
         return normalized;
       }
 
+      function teamKey(generals) {
+        return [...generals].sort((a, b) => a.localeCompare(b, "zh-CN")).join("||");
+      }
+
+      function skillSignature(team) {
+        return team.generals.map((general) => `${general}:${(team.skills?.[general] || []).join(",")}`).join("|");
+      }
+
+      function buildLibraryGroups(data) {
+        const groups = new Map();
+        const strongTeams = (data.s2_strong_teams || []).flatMap((group) =>
+          (group.teams || []).map((team, index) => normalizeTeam(team, `strong-${group.start_row}-${index}`, "S2强队合集", group.tier, 0))
+        );
+        const coexistTeams = (data.s2_coexist_plans || []).flatMap((plan, planIndex) =>
+          (plan.teams || []).map((team, teamIndex) => normalizeTeam(team, `coexist-${planIndex}-${teamIndex}`, "S2五队共存", plan.plan_name, 1))
+        );
+
+        strongTeams.forEach((team) => {
+          const key = teamKey(team.generals);
+          if (!groups.has(key)) {
+            groups.set(key, {
+              key,
+              generals: team.generals,
+              names: new Set(),
+              strength: team.strength,
+              variants: [],
+              signatures: new Set(),
+            });
+          }
+          const group = groups.get(key);
+          group.names.add(team.team_name);
+          group.strength = Math.min(group.strength, team.strength);
+          group.variants.push({ team, type: "strong" });
+          group.signatures.add(skillSignature(team));
+        });
+
+        coexistTeams.forEach((team) => {
+          const key = teamKey(team.generals);
+          const group = groups.get(key);
+          if (!group) return;
+          const signature = skillSignature(team);
+          if (group.signatures.has(signature)) return;
+          group.variants.push({ team, type: "coexist" });
+          group.signatures.add(signature);
+        });
+
+        return [...groups.values()].map((group) => ({
+          ...group,
+          names: [...group.names],
+          variants: group.variants.sort((a, b) =>
+            (a.type === b.type ? 0 : a.type === "strong" ? -1 : 1) ||
+            a.team.strength - b.team.strength ||
+            a.team.team_name.localeCompare(b.team.team_name, "zh-CN")
+          ),
+        }));
+      }
+
       function flattenTeams(data) {
         const coexist = (data.s2_coexist_plans || []).flatMap((plan) =>
           (plan.teams || []).map((team) => ({
@@ -628,6 +786,83 @@
             <span>${name}</span>
           </label>
         `).join("");
+        container.addEventListener("change", updateSelectedCount);
+      }
+
+      function optionMarkup(name, groupName) {
+        return `
+          <label class="option" data-name="${escapeHtml(name)}">
+            <input type="checkbox" name="${groupName}" value="${escapeHtml(name)}">
+            <span>${escapeHtml(name)}</span>
+          </label>
+        `;
+      }
+
+      function renderGeneralOptions() {
+        const container = $("generalList");
+        container.className = "group-list";
+        const order = ["魏", "蜀", "吴", "群", "未分类"];
+        const groups = new Map(order.map((name) => [name, []]));
+        state.generals.forEach((name) => {
+          const camp = state.generalMeta[name]?.camp || "未分类";
+          if (!groups.has(camp)) groups.set(camp, []);
+          groups.get(camp).push(name);
+        });
+        container.innerHTML = [...groups.entries()]
+          .filter(([, names]) => names.length)
+          .map(([camp, names]) => `
+            <details class="group" open>
+              <summary><span>${camp}</span><span class="group-count">${names.length}</span></summary>
+              <div class="check-grid">${names.map((name) => optionMarkup(name, "generals")).join("")}</div>
+            </details>
+          `).join("");
+        container.addEventListener("change", updateSelectedCount);
+      }
+
+      function renderSkillOptions() {
+        const container = $("skillList");
+        container.className = "group-list";
+        const activationOrder = ["主动", "被动", "指挥", "追击", "未分类"];
+        const effectOrder = ["兵刃", "谋略", "辅助", "治疗", "防御", "文武", "未分类"];
+        const groups = new Map();
+        state.skills.forEach((name) => {
+          const meta = state.skillMeta[name] || {};
+          const activation = meta.activation_type || "未分类";
+          const effect = meta.effect_type || "未分类";
+          if (!groups.has(activation)) groups.set(activation, new Map());
+          if (!groups.get(activation).has(effect)) groups.get(activation).set(effect, []);
+          groups.get(activation).get(effect).push(name);
+        });
+        const activations = [...groups.keys()].sort((a, b) =>
+          (activationOrder.indexOf(a) === -1 ? 99 : activationOrder.indexOf(a)) -
+          (activationOrder.indexOf(b) === -1 ? 99 : activationOrder.indexOf(b)) ||
+          a.localeCompare(b, "zh-CN")
+        );
+        container.innerHTML = activations.map((activation) => {
+          const effectMap = groups.get(activation);
+          const total = [...effectMap.values()].reduce((sum, names) => sum + names.length, 0);
+          const effects = [...effectMap.keys()].sort((a, b) =>
+            (effectOrder.indexOf(a) === -1 ? 99 : effectOrder.indexOf(a)) -
+            (effectOrder.indexOf(b) === -1 ? 99 : effectOrder.indexOf(b)) ||
+            a.localeCompare(b, "zh-CN")
+          );
+          return `
+            <details class="group" open>
+              <summary><span>${activation}</span><span class="group-count">${total}</span></summary>
+              <div class="subgroup-wrap">
+                ${effects.map((effect) => {
+                  const names = effectMap.get(effect);
+                  return `
+                    <details class="subgroup" open>
+                      <summary><span>${effect}</span><span class="group-count">${names.length}</span></summary>
+                      <div class="check-grid">${names.map((name) => optionMarkup(name, "skills")).join("")}</div>
+                    </details>
+                  `;
+                }).join("")}
+              </div>
+            </details>
+          `;
+        }).join("");
         container.addEventListener("change", updateSelectedCount);
       }
 
@@ -704,6 +939,33 @@
         }).join("");
       }
 
+      function renderVariant(variant, selectedSkills) {
+        const team = variant.team;
+        const label = variant.type === "strong" ? "强队合集" : "五队共存补充";
+        const rows = team.generals.map((general) => {
+          const skills = team.skills?.[general] || [];
+          return `
+            <div class="general-row">
+              <div class="general-name">${escapeHtml(general)}</div>
+              <div class="skill-list">${skills.map((skill) => teamSkillChip(skill, selectedSkills)).join("")}</div>
+            </div>
+          `;
+        }).join("");
+        const missing = variant.missingSkills.length
+          ? `<div class="missing">${missingSkillChips(variant.missingSkills)}</div>`
+          : "";
+        return `
+          <div class="variant ${variant.type === "coexist" ? "alt" : ""}">
+            <div class="variant-head">
+              <div class="variant-title">${escapeHtml(team.team_name)}</div>
+              <div class="variant-tag">${label} · 战法 ${variant.matchedSkills.length}/${team.requiredSkills.length}</div>
+            </div>
+            <div class="rows">${rows}</div>
+            ${missing}
+          </div>
+        `;
+      }
+
       function scoreTeam(team, selectedGenerals, selectedSkills) {
         const matchedGenerals = team.generals.filter((name) => selectedGenerals.has(name));
         const missingGenerals = team.generals.filter((name) => !selectedGenerals.has(name));
@@ -725,21 +987,51 @@
         };
       }
 
+      function scoreVariant(variant, selectedSkills) {
+        const team = variant.team;
+        const matchedSkills = team.requiredSkills.filter((name) => skillMatched(name, selectedSkills));
+        const missingSkills = team.requiredSkills.filter((name) => !skillMatched(name, selectedSkills));
+        return {
+          ...variant,
+          matchedSkills,
+          missingSkills,
+          skillScore: team.requiredSkills.length ? matchedSkills.length / team.requiredSkills.length : 0,
+        };
+      }
+
+      function scoreLibraryGroup(group, selectedSkills) {
+        const variants = group.variants
+          .map((variant) => scoreVariant(variant, selectedSkills))
+          .sort((a, b) =>
+            b.skillScore - a.skillScore ||
+            (a.type === b.type ? 0 : a.type === "strong" ? -1 : 1) ||
+            a.team.strength - b.team.strength ||
+            a.team.team_name.localeCompare(b.team.team_name, "zh-CN")
+          );
+        const best = variants[0];
+        return {
+          group,
+          variants,
+          best,
+          skillScore: best?.skillScore || 0,
+          strength: group.strength,
+        };
+      }
+
       function matchTeams() {
         const selectedGenerals = getSelected("generals");
         const selectedSkills = getSelected("skills");
 
-        const matches = state.teams
-          .map((team) => scoreTeam(team, selectedGenerals, selectedSkills))
-          .filter((match) => match.missingGenerals.length === 0)
+        const matches = state.libraryGroups
+          .filter((group) => group.generals.every((name) => selectedGenerals.has(name)))
+          .map((group) => scoreLibraryGroup(group, selectedSkills))
           .sort((a, b) =>
             b.skillScore - a.skillScore ||
-            a.team.strength - b.team.strength ||
-            a.team.priority - b.team.priority ||
-            a.team.team_name.localeCompare(b.team.team_name, "zh-CN")
+            a.strength - b.strength ||
+            a.group.names[0].localeCompare(b.group.names[0], "zh-CN")
           );
 
-        renderResults(pickUniqueOwnedHeroTeams(matches, selectedSkills));
+        renderResults(pickUniqueLibraryGroups(matches, selectedSkills));
       }
 
       function preferredSkill(required, selectedSkills, usedSkills) {
@@ -807,6 +1099,24 @@
         return picked;
       }
 
+      function pickUniqueLibraryGroups(matches, selectedSkills) {
+        const picked = [];
+        const usedGenerals = new Set();
+        const usedSkills = new Set();
+
+        for (const match of matches) {
+          if (picked.length >= 5) break;
+          if (match.group.generals.some((name) => usedGenerals.has(name))) continue;
+          const matchedSkillNames = match.best.matchedSkills.map((skill) => preferredSkill(skill, selectedSkills, usedSkills));
+          if (matchedSkillNames.some((name) => usedSkills.has(name))) continue;
+          picked.push(match);
+          match.group.generals.forEach((name) => usedGenerals.add(name));
+          matchedSkillNames.forEach((name) => usedSkills.add(name));
+        }
+
+        return picked;
+      }
+
       function scorePlan(plan, selectedGenerals, selectedSkills) {
         const matches = plan.teams.map((team) => scoreTeam(team, selectedGenerals, selectedSkills));
         const planUsedSkills = new Set();
@@ -862,37 +1172,23 @@
         }
 
         $("results").innerHTML = matches.map((match) => {
-          const team = match.team;
-          const score = `武将 ${match.matchedGenerals.length}/${team.generals.length} · 战法 ${match.matchedSkills.length}/${team.requiredSkills.length}`;
           const selectedSkills = getSelected("skills");
-          const rows = team.generals.map((general) => {
-            const skills = team.skills?.[general] || [];
-            return `
-              <div class="general-row">
-                <div class="general-name">${escapeHtml(general)}</div>
-                <div class="skill-list">${skills.map((skill) => teamSkillChip(skill, selectedSkills)).join("")}</div>
-              </div>
-            `;
-          }).join("");
-          const missingSkills = missingSkillChips(match.missingSkills);
-          const substitutions = substitutionRows(match.substitutions);
-          const missingGenerals = match.missingGenerals.length
-            ? `<div>缺武将: ${match.missingGenerals.join("、")}</div>`
-            : "";
-          const missingBlock = missingGenerals || missingSkills || substitutions
-            ? `<div class="missing">${missingGenerals}${missingSkills}${substitutions}</div>`
-            : "";
+          const group = match.group;
+          const strongCount = group.variants.filter((variant) => variant.type === "strong").length;
+          const altCount = group.variants.filter((variant) => variant.type === "coexist").length;
+          const score = `最佳战法 ${match.best.matchedSkills.length}/${match.best.team.requiredSkills.length}`;
+          const variants = match.variants.map((variant) => renderVariant(variant, selectedSkills)).join("");
 
           return `
             <article class="match">
               <div class="match-top">
                 <div>
-                  <h3>${team.team_name}</h3>
+                  <h3>${group.names.map(escapeHtml).join(" / ")}</h3>
+                  <div class="small">${group.generals.map(escapeHtml).join("、")} · 强队组合 ${strongCount} 套 · 补充组合 ${altCount} 套</div>
                 </div>
                 <div class="score">${score}</div>
               </div>
-              <div class="rows">${rows}</div>
-              ${missingBlock}
+              <div class="variant-list">${variants}</div>
             </article>
           `;
         }).join("");
@@ -905,13 +1201,16 @@
           const data = await response.json();
           state.teams = flattenTeams(data);
           state.plans = buildCoexistPlans(data);
+          state.libraryGroups = buildLibraryGroups(data);
           state.replacement = buildReplacementMap(data.replacement_guide);
+          state.generalMeta = data.metadata?.generals || {};
+          state.skillMeta = data.metadata?.skills || {};
           state.generals = uniqueSorted(state.teams.flatMap((team) => team.generals));
           state.skills = uniqueSorted(state.teams.flatMap((team) => team.requiredSkills.flatMap(splitSkillName)));
 
-          renderOptions("generalList", state.generals, "generals");
-          renderOptions("skillList", state.skills, "skills");
-          $("status").textContent = `已载入 ${state.plans.length} 套五队方案、${state.teams.length} 个队伍，优先按 S2 五队共存匹配`;
+          renderGeneralOptions();
+          renderSkillOptions();
+          $("status").textContent = `已载入强队组合 ${state.libraryGroups.length} 组（含 S1 补充），五队共存仅用于补充战法组合`;
           updateSelectedCount();
         } catch (error) {
           $("status").textContent = "队伍数据读取失败";
